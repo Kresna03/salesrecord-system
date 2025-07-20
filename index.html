@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Target Jualan Athifa Azzahrah</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table, th, td { border: 1px solid #ddd; border-collapse: collapse; }
+    th, td { padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    .btn { margin: 4px; padding: 6px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Sistem Rekod Jualan Athifa Azzahrah</h2>
+  <form id="salesForm">
+    <input type="date" id="tarikh" required>
+    <select id="kategori">
+      <option value="TIKTOK LIVE">TIKTOK LIVE</option>
+      <option value="TIKTOK VIDEO">TIKTOK VIDEO</option>
+      <option value="TIKTOK AFFILIATE">TIKTOK AFFILIATE</option>
+      <option value="TIKTOK SHOP">TIKTOK SHOP</option>
+      <option value="SHOPEE LIVE">SHOPEE LIVE</option>
+      <option value="SHOPEE VIDEO">SHOPEE VIDEO</option>
+      <option value="SHOPEE AFFILIATE">SHOPEE AFFILIATE</option>
+      <option value="SHOPEE SHOP">SHOPEE SHOP</option>
+      <option value="ONLINE SALES">ONLINE SALES</option>
+      <option value="WALK IN">WALK IN</option>
+      
+    </select>
+    <input type="number" step="0.01" id="sasaran" placeholder="Target (RM)" required>
+    <input type="number" step="0.01" id="dicapai" placeholder="Achieved (RM)" required>
+    <input type="number" step="0.01" id="targetPercent" placeholder="Target % (Manual)">
+    <button type="submit">Simpan</button>
+  </form>
+
+  <br />
+  <label for="filterKategori">Tapis mengikut kategori: </label>
+  <select id="filterKategori">
+    <option value="SEMUA">SEMUA</option>
+    <option value="TIKTOK LIVE">TIKTOK LIVE</option>
+    <option value="TIKTOK VIDEO">TIKTOK VIDEO</option>
+    <option value="TIKTOK AFFILIATE">TIKTOK AFFILIATE</option>
+    <option value="TIKTOK SHOP">TIKTOK SHOP</option>
+    <option value="SHOPEE LIVE">SHOPEE LIVE</option>
+    <option value="SHOPEE VIDEO">SHOPEE VIDEO</option>
+    <option value="SHOPEE AFFILIATE">SHOPEE AFFILIATE</option>
+    <option value="SHOPEE SHOP">SHOPEE SHOP</option>
+    <option value="ONLINE SALES">ONLINE SALES</option>
+    <option value="WALK IN">WALK IN</option>
+    
+  </select>
+
+  <table id="salesTable">
+    <thead>
+      <tr>
+        <th>Tarikh</th>
+        <th>Kategori</th>
+        <th>Target (RM)</th>
+        <th>Achieved (RM)</th>
+        <th>Target % (Manual)</th>
+        <th>Achieved %</th>
+        <th>Tindakan</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <canvas id="barChart" height="100"></canvas>
+
+  <!-- Firebase SDK & Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAyyPvsDOCRcvBGBfYMBgHOJ4qgzLmOscU",
+      authDomain: "target-sales-83b6d.firebaseapp.com",
+      projectId: "target-sales-83b6d",
+      storageBucket: "target-sales-83b6d.appspot.com",
+      messagingSenderId: "620231591031",
+      appId: "1:620231591031:web:8a601f420577072e467272",
+      measurementId: "G-LZ2ZBEYP4D"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const salesCollection = collection(db, "rekodJualan");
+
+    const form = document.getElementById("salesForm");
+    const tableBody = document.querySelector("#salesTable tbody");
+    const filter = document.getElementById("filterKategori");
+
+    let chart;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const tarikh = document.getElementById("tarikh").value;
+      const kategori = document.getElementById("kategori").value;
+      const sasaran = +document.getElementById("sasaran").value;
+      const dicapai = +document.getElementById("dicapai").value;
+      const targetPercent = +document.getElementById("targetPercent").value;
+      const peratus = ((dicapai / sasaran) * 100).toFixed(2);
+
+      await addDoc(salesCollection, { tarikh, kategori, sasaran, dicapai, targetPercent, peratus });
+      form.reset();
+      paparkanData();
+    });
+
+    async function paparkanData() {
+      const snapshot = await getDocs(salesCollection);
+      const data = [];
+      tableBody.innerHTML = "";
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        d.id = docSnap.id;
+        data.push(d);
+      });
+
+      const kategoriTapis = filter.value;
+      const ditapis = kategoriTapis === "SEMUA" ? data : data.filter(d => d.kategori === kategoriTapis);
+
+      ditapis.forEach(d => {
+        const row = tableBody.insertRow();
+        row.insertCell().innerText = d.tarikh;
+        row.insertCell().innerText = d.kategori;
+        row.insertCell().innerText = (+d.sasaran).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        row.insertCell().innerText = (+d.dicapai).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        row.insertCell().innerText = d.targetPercent || "-";
+        row.insertCell().innerText = (+d.peratus).toFixed(2);
+
+        const actions = row.insertCell();
+        const btnPadam = document.createElement("button");
+        btnPadam.innerText = "Padam";
+        btnPadam.className = "btn";
+        btnPadam.onclick = async () => {
+          await deleteDoc(doc(db, "rekodJualan", d.id));
+          paparkanData();
+        };
+
+        const btnEdit = document.createElement("button");
+        btnEdit.innerText = "Edit";
+        btnEdit.className = "btn";
+        btnEdit.onclick = async () => {
+          const baruDicapai = prompt("Masukkan nilai dicapai baru:", d.dicapai);
+          if (baruDicapai !== null) {
+            const peratusBaru = ((+baruDicapai / d.sasaran) * 100).toFixed(2);
+            await updateDoc(doc(db, "rekodJualan", d.id), {
+              dicapai: +baruDicapai,
+              peratus: peratusBaru
+            });
+            paparkanData();
+          }
+        };
+
+        actions.appendChild(btnEdit);
+        actions.appendChild(btnPadam);
+      });
+
+      updateChart(ditapis);
+    }
+
+    filter.addEventListener("change", paparkanData);
+
+    function updateChart(data) {
+      const label = data.map(d => d.tarikh + " - " + d.kategori);
+      const target = data.map(d => d.sasaran);
+      const achieved = data.map(d => d.dicapai);
+
+      if (chart) chart.destroy();
+
+      const ctx = document.getElementById("barChart").getContext("2d");
+      chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: label,
+          datasets: [
+            {
+              label: "Target",
+              data: target,
+              backgroundColor: "#f87171"
+            },
+            {
+              label: "Achieved",
+              data: achieved,
+              backgroundColor: "#34d399"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "top" },
+            title: { display: true, text: "Perbandingan Target vs Achieved" }
+          }
+        }
+      });
+    }
+
+    paparkanData();
+  </script>
+</body>
+</html>
